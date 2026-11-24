@@ -7,6 +7,8 @@ import socket
 import subprocess
 import time
 
+from process_lifetime import bind_to_this_process
+
 EXECUTABLE_NAME = "llama-server"
 HOST = "127.0.0.1"
 
@@ -43,6 +45,7 @@ class LlamaServer:
         self.log_path = log_path
         self.port = find_free_port()
         self.process = None
+        self.lifetime_job = None
         self.model_path = None
 
     def start(self, on_waiting):
@@ -60,6 +63,7 @@ class LlamaServer:
         log = open(self.log_path, "w", encoding="utf-8")
         new_process_group = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0
         self.process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, creationflags=new_process_group, start_new_session=os.name != "nt")
+        self.lifetime_job = bind_to_this_process(self.process)
 
         self.wait_until_healthy(on_waiting)
         self.model_path = self.get_json("/props")["model_path"]

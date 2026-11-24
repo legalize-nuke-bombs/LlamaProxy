@@ -1,13 +1,14 @@
 import json
 import os
 import socketserver
+import sys
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from llama_server import LlamaServerError
 
 CHAT_PATHS = {"/v1/chat/completions", "/chat/completions"}
-HOP_BY_HOP_HEADERS = {"connection", "keep-alive", "transfer-encoding", "content-length", "host"}
+NOT_RELAYED_HEADERS = {"connection", "keep-alive", "transfer-encoding", "content-length", "host", "server", "date"}
 CHUNK_SIZE = 64 * 1024
 
 
@@ -54,16 +55,22 @@ def create_proxy_server(port, server, cache):
                     cache.fail(entry)
 
         def relay(self, body):
-            headers = {name: value for name, value in self.headers.items() if name.lower() not in HOP_BY_HOP_HEADERS}
+            headers = {name: value for name, value in self.headers.items() if name.lower() not in NOT_RELAYED_HEADERS}
             response = server.request(self.command, self.path, body, headers)
+            try:
+                return self.relay_response(response)
+            except ConnectionError:
+                return None, None
+            finally:
+                response.close()
 
+        def relay_response(self, response):
             self.send_response(response.status)
             for name, value in response.getheaders():
-                if name.lower() not in HOP_BY_HOP_HEADERS:
+                if name.lower() not in NOT_RELAYED_HEADERS:
                     self.send_header(name, value)
 
-            content_length = response.getheader("Content-Length")
-            if content_length is not None:
+            if response.getheader("Content-Length") is not None:
                 reply = response.read()
                 self.send_header("Content-Length", str(len(reply)))
                 self.end_headers()
@@ -90,6 +97,10 @@ class ProxyHTTPServer(ThreadingHTTPServer):
     def server_bind(self):
         socketserver.TCPServer.server_bind(self)
         self.server_name, self.server_port = self.server_address[:2]
+
+    def handle_error(self, request, client_address):
+        if not isinstance(sys.exc_info()[1], ConnectionError):
+            super().handle_error(request, client_address)
 
 
 def print_timings(reply):
