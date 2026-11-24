@@ -43,7 +43,7 @@ def save_settings(settings, path):
 
 
 def ask_settings(previous):
-    print("Enter keeps the value in brackets")
+    print("Leave blank to keep the current value")
     return Settings(
         model=ask("Model, .gguf path or Hugging Face repo:quant", previous.model, str),
         context_k_tokens=ask("Context, K tokens", previous.context_k_tokens, int),
