@@ -1,0 +1,6 @@
+.idea/
+.venv/
+__pycache__/
+cache/
+settings.json
+llama-server.log
