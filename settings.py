@@ -43,13 +43,13 @@ def save_settings(settings, path):
 
 
 def ask_settings(previous):
-    print("Press Enter to keep the value in brackets, or type a new one.\n")
+    print("Enter keeps the value in brackets")
     return Settings(
-        model=ask("Model: path to a .gguf file, or a Hugging Face repo like user/model:Q4_K_M", previous.model, str),
-        context_k_tokens=ask("Context size in K tokens, 256 = 262144 tokens", previous.context_k_tokens, int),
-        port=ask("Port the game connects to", previous.port, int),
-        cache_limit_gb=ask("How much disk space the cache may take, GB", previous.cache_limit_gb, int),
-        kv_cache_type=ask("KV cache type: f16, q8_0 (half the memory of f16) or q4_0 (a quarter)", previous.kv_cache_type, parse_kv_cache_type),
+        model=ask("Model, .gguf path or Hugging Face repo:quant", previous.model, str),
+        context_k_tokens=ask("Context, K tokens", previous.context_k_tokens, int),
+        port=ask("Port", previous.port, int),
+        cache_limit_gb=ask("Disk cache limit, GB", previous.cache_limit_gb, int),
+        kv_cache_type=ask(f"KV cache type, {' / '.join(KV_CACHE_TYPES)}", previous.kv_cache_type, parse_kv_cache_type),
     )
 
 
@@ -60,17 +60,14 @@ def parse_kv_cache_type(answer):
 
 
 def ask(label, previous, parse):
-    print(label)
+    prompt = f"{label} [{previous}]: " if previous != "" else f"{label}: "
     while True:
-        answer = input(f"[{previous}]: " if previous != "" else ": ").strip()
+        answer = input(prompt).strip()
         if not answer:
             if previous != "":
-                print()
                 return previous
             continue
         try:
-            value = parse(answer)
-            print()
-            return value
+            return parse(answer)
         except ValueError:
-            print(f"Can't use '{answer}', try again")
+            print(f"Can't use '{answer}'")
