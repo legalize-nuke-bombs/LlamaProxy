@@ -1,5 +1,6 @@
 import json
 import os
+import socketserver
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -80,11 +81,15 @@ def create_proxy_server(port, server, cache):
         def log_message(self, format, *args):
             pass
 
-    return ExclusiveThreadingHTTPServer(("0.0.0.0", port), ProxyHandler)
+    return ProxyHTTPServer(("0.0.0.0", port), ProxyHandler)
 
 
-class ExclusiveThreadingHTTPServer(ThreadingHTTPServer):
+class ProxyHTTPServer(ThreadingHTTPServer):
     allow_reuse_address = os.name != "nt"
+
+    def server_bind(self):
+        socketserver.TCPServer.server_bind(self)
+        self.server_name, self.server_port = self.server_address[:2]
 
 
 def print_timings(reply):

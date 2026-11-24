@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 
 from llama_server import LlamaServer, LlamaServerError, find_running_llama_servers, kill_process
 from proxy import create_proxy_server
@@ -42,12 +43,13 @@ def main():
         return
 
     try:
-        print(f"Starting llama-server, log in {LOG_PATH}")
-        server.start()
+        started = time.perf_counter()
+        server.start(on_waiting=lambda elapsed: print(f"\rLoading the model... {elapsed:.0f} s", end="", flush=True))
+        print(f"\rModel loaded in {time.perf_counter() - started:.0f} s, llama-server log: {LOG_PATH}")
         print(f"Listening on port {settings.port}, Ctrl+C to stop")
         proxy.serve_forever()
     except LlamaServerError as error:
-        print(error)
+        print(f"\n{error}")
     except KeyboardInterrupt:
         try:
             cache.save_current()

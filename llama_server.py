@@ -45,7 +45,7 @@ class LlamaServer:
         self.process = None
         self.model_path = None
 
-    def start(self):
+    def start(self, on_waiting):
         executable = shutil.which(EXECUTABLE_NAME)
         if executable is None:
             raise LlamaServerError(f"{EXECUTABLE_NAME} is not in PATH")
@@ -61,11 +61,13 @@ class LlamaServer:
         new_process_group = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0
         self.process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, creationflags=new_process_group, start_new_session=os.name != "nt")
 
-        self.wait_until_healthy()
+        self.wait_until_healthy(on_waiting)
         self.model_path = self.get_json("/props")["model_path"]
 
-    def wait_until_healthy(self):
+    def wait_until_healthy(self, on_waiting):
+        started = time.perf_counter()
         while True:
+            on_waiting(time.perf_counter() - started)
             if self.process.poll() is not None:
                 raise LlamaServerError(f"{EXECUTABLE_NAME} exited with code {self.process.returncode}, see {self.log_path}")
             try:
