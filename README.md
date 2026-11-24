@@ -12,7 +12,7 @@ Requires Python 3.10 or newer and `llama-server` in `PATH` (download it from the
 python main.py
 ```
 
-The proxy asks for the model, the context size, the port, the cache limit on disk and extra `llama-server` arguments, and remembers the answers for the next run. If `llama-server` is already running, it offers to kill it. Then it starts its own `llama-server` and listens on all interfaces on the given port with the same API.
+The proxy asks for the model, the context size, the port, the cache limit on disk and the KV cache type, and remembers the answers for the next run. If `llama-server` is already running, it offers to kill it. Then it starts its own `llama-server` and listens on all interfaces on the given port with the same API.
 
 ## How it works
 

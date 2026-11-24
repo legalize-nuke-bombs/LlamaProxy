@@ -1,9 +1,8 @@
 import json
 import os
-import shlex
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, fields
 
-DEFAULT_EXTRA_ARGUMENTS = "-fa on -ctk q8_0 -ctv q8_0"
+KV_CACHE_TYPES = ("f16", "q8_0", "q4_0")
 
 
 @dataclass
@@ -11,8 +10,8 @@ class Settings:
     model: str = ""
     context_k_tokens: int = 256
     port: int = 8090
-    cache_limit_gb: float = 20
-    extra_arguments: str = DEFAULT_EXTRA_ARGUMENTS
+    cache_limit_gb: int = 20
+    kv_cache_type: str = "q8_0"
 
     def model_arguments(self):
         if os.path.isfile(self.model):
@@ -20,15 +19,22 @@ class Settings:
         return ["-hf", self.model]
 
     def llama_server_arguments(self):
-        extra = [argument.strip('"') for argument in shlex.split(self.extra_arguments, posix=False)]
-        return [*self.model_arguments(), "-c", str(self.context_k_tokens * 1024), *extra]
+        return [
+            *self.model_arguments(),
+            "-c", str(self.context_k_tokens * 1024),
+            "-ctk", self.kv_cache_type, "-ctv", self.kv_cache_type,
+        ]
 
 
 def load_settings(path):
     if not os.path.isfile(path):
         return Settings()
     with open(path, encoding="utf-8") as file:
-        return Settings(**json.load(file))
+        saved = json.load(file)
+    known = {field.name for field in fields(Settings)}
+    settings = Settings(**{name: value for name, value in saved.items() if name in known})
+    settings.cache_limit_gb = int(settings.cache_limit_gb)
+    return settings
 
 
 def save_settings(settings, path):
@@ -37,23 +43,34 @@ def save_settings(settings, path):
 
 
 def ask_settings(previous):
+    print("Press Enter to keep the value in brackets, or type a new one.\n")
     return Settings(
-        model=ask("Model (.gguf path or Hugging Face repo:quant)", previous.model, str, required=True),
-        context_k_tokens=ask("Context, K tokens", previous.context_k_tokens, int),
-        port=ask("Port", previous.port, int),
-        cache_limit_gb=ask("Cache limit on disk, GB", previous.cache_limit_gb, float),
-        extra_arguments=ask("Extra llama-server arguments, - for none", previous.extra_arguments, lambda answer: "" if answer == "-" else answer),
+        model=ask("Model: path to a .gguf file, or a Hugging Face repo like user/model:Q4_K_M", previous.model, str),
+        context_k_tokens=ask("Context size in K tokens, 256 = 262144 tokens", previous.context_k_tokens, int),
+        port=ask("Port the game connects to", previous.port, int),
+        cache_limit_gb=ask("How much disk space the cache may take, GB", previous.cache_limit_gb, int),
+        kv_cache_type=ask("KV cache type: f16, q8_0 (half the memory of f16) or q4_0 (a quarter)", previous.kv_cache_type, parse_kv_cache_type),
     )
 
 
-def ask(label, previous, parse, required=False):
+def parse_kv_cache_type(answer):
+    if answer not in KV_CACHE_TYPES:
+        raise ValueError
+    return answer
+
+
+def ask(label, previous, parse):
+    print(label)
     while True:
-        answer = input(f"{label} [{previous}]: ").strip()
+        answer = input(f"[{previous}]: " if previous != "" else ": ").strip()
         if not answer:
-            if required and not previous:
-                continue
-            return previous
+            if previous != "":
+                print()
+                return previous
+            continue
         try:
-            return parse(answer)
+            value = parse(answer)
+            print()
+            return value
         except ValueError:
-            print(f"Can't read '{answer}'")
+            print(f"Can't use '{answer}', try again")
